@@ -2,6 +2,7 @@ extern crate serialize;
 
 use serialize::json;
 use std::collections::TreeMap;
+use std::io::net::ip::{IpAddr, Ipv4Addr};
 
 pub enum Id {
     StringBased(String),
@@ -129,3 +130,20 @@ impl json::ToJson for ErrorResponse {
         json::Object(obj)
     }
 }
+
+pub struct Server {
+    requestSender: Sender<(Vec<Request>, Sender<Vec<Response>>)>,
+    requests: Receiver<(Vec<Request>, Sender<Vec<Response>>)>
+}
+
+impl Server {
+    pub fn new() -> Server {
+        let (tx, rx) = channel();
+
+        Server {
+            requestSender: tx,
+            requests: rx,
+        }
+    }
+}
+
