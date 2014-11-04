@@ -7,6 +7,15 @@ pub enum Id {
     NumberBased(f64)
 }
 
+impl json::ToJson for Id {
+    fn to_json(&self) -> json::Json {
+        match *self {
+            StringBased(ref s) => s.to_json(),
+            NumberBased(ref n) => n.to_json()
+        }
+    }
+}
+
 pub enum Parameters {
     Positional(json::JsonList),
     Named(json::JsonObject)
