@@ -1,0 +1,5 @@
+[package]
+
+name = "rust-json-rpc"
+version = "0.0.1"
+authors = ["Yusuf Simonson <simonson@gmail.com>"]
