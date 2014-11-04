@@ -1,8 +1,12 @@
 extern crate serialize;
+extern crate iron;
 
 use serialize::json;
 use std::collections::TreeMap;
 use std::io::net::ip::{IpAddr, Ipv4Addr};
+use iron::{status, Iron, IronResult};
+use iron::Request as IronRequest;
+use iron::Response as IronResponse;
 
 pub enum Id {
     StringBased(String),
@@ -144,6 +148,10 @@ impl Server {
             requestSender: tx,
             requests: rx,
         }
+    }
+
+    pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
+        Ok(IronResponse::with(status::Ok, "Hello, world"))
     }
 }
 
