@@ -28,6 +28,16 @@ pub struct Request {
     params: Parameters
 }
 
+impl Request {
+    pub fn new(id: Option<Id>, method: String, params: Parameters) -> Request {
+        return Request {
+            id: id,
+            method: method,
+            params: params,
+        }
+    }
+}
+
 pub enum Response {
     Normal(NormalResponse),
     Error(ErrorResponse)
@@ -47,6 +57,15 @@ pub struct NormalResponse {
     result: json::Json
 }
 
+impl NormalResponse {
+    pub fn new(id: Id, result: json::Json) -> NormalResponse {
+        return NormalResponse {
+            id: id,
+            result: result,
+        }
+    }
+}
+
 impl json::ToJson for NormalResponse {
     fn to_json(&self) -> json::Json {
         let mut obj: TreeMap<String, json::Json> = TreeMap::new();
@@ -64,6 +83,37 @@ pub struct ErrorResponse {
     data: json::Json
 }
 
+impl ErrorResponse {
+    pub fn new(id: Option<Id>, code: int, message: String, data: json::Json) -> ErrorResponse {
+        ErrorResponse {
+            id: id,
+            code: code,
+            message: message,
+            data: data,
+        }
+    }
+
+    fn newParseError() -> ErrorResponse {
+        ErrorResponse::new(None, -32700, "Parse error".to_string(), json::Null)
+    }
+
+    fn newInvalidRequest(data: json::Json) -> ErrorResponse {
+        ErrorResponse::new(None, -32600, "Invalid Request".to_string(), data)
+    }
+
+    pub fn newMethodNotFound(id: Id, data: json::Json) -> ErrorResponse {
+        ErrorResponse::new(Some(id), -32601, "Method not found".to_string(), data)
+    }
+
+    pub fn newInvalidParams(id: Id, data: json::Json) -> ErrorResponse {
+        ErrorResponse::new(Some(id), -32602, "Invalid params".to_string(), data)
+    }
+
+    fn newInternalError(id: Id, data: json::Json) -> ErrorResponse {
+        ErrorResponse::new(Some(id), -32603, "Internal error".to_string(), data)
+    }
+}
+
 impl json::ToJson for ErrorResponse {
     fn to_json(&self) -> json::Json {
         let mut errorObj: TreeMap<String, json::Json> = TreeMap::new();
@@ -79,4 +129,3 @@ impl json::ToJson for ErrorResponse {
         json::Object(obj)
     }
 }
-
