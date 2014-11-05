@@ -7,6 +7,7 @@ use std::io::net::ip::{IpAddr, Ipv4Addr};
 use iron::{status, Iron, IronResult};
 use iron::Request as IronRequest;
 use iron::Response as IronResponse;
+use std::str;
 
 pub enum Id {
     StringBased(String),
@@ -151,7 +152,9 @@ impl Server {
     }
 
     pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
-        Ok(IronResponse::with(status::Ok, "Hello, world"))
+        match str::from_utf8(req.body.as_slice()).and_then(|body| json::from_str(body).ok()) {
+            Some(body) => Ok(IronResponse::with(status::Ok, "JSON parsed")),
+            None => Ok(IronResponse::with(status::Ok, "JSON not parsed"))
+        }
     }
 }
-
