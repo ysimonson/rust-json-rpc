@@ -154,7 +154,8 @@ impl Server {
     fn respond(&self, http_req: &mut IronRequest, jrpc_res: Response) -> IronResult<IronResponse> {
         let res_str = encode(&jrpc_res.to_json());
         let res_bytes = res_str.as_bytes();
-        let http_res = IronResponse::with(status::Ok, res_bytes);
+        let mut http_res = IronResponse::with(status::Ok, res_bytes);
+        http_res.headers.content_type = Some(iron::headers::content_type::MediaType::new("application".to_string(), "json".to_string(), Vec::new()));
         Ok(http_res)
     }
 
