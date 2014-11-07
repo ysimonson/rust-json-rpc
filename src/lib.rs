@@ -151,7 +151,7 @@ impl Server {
         }
     }
 
-    fn respond(&self, http_req: &mut IronRequest, jrpc_res: Response) -> IronResult<IronResponse> {
+    fn respond(&self, jrpc_res: Response) -> IronResult<IronResponse> {
         let res_str = encode(&jrpc_res.to_json());
         let res_bytes = res_str.as_bytes();
         let mut http_res = IronResponse::with(status::Ok, res_bytes);
@@ -161,8 +161,8 @@ impl Server {
 
     pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
         match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
-            Some(body) => self.respond(req, Error(ErrorResponse::newParseError())),
-            None => self.respond(req, Error(ErrorResponse::newParseError()))
+            Some(body) => self.respond(Error(ErrorResponse::newParseError())),
+            None => self.respond(Error(ErrorResponse::newParseError()))
         }
     }
 }
