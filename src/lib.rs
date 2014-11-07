@@ -1,7 +1,7 @@
 extern crate serialize;
 extern crate iron;
 
-use serialize::json;
+use serialize::json::{ToJson, Json, JsonList, JsonObject, Object, Null, encode, from_str};
 use std::collections::TreeMap;
 use std::io::net::ip::{IpAddr, Ipv4Addr};
 use iron::{status, Iron, IronResult};
@@ -14,8 +14,8 @@ pub enum Id {
     NumberBased(f64)
 }
 
-impl json::ToJson for Id {
-    fn to_json(&self) -> json::Json {
+impl ToJson for Id {
+    fn to_json(&self) -> Json {
         match *self {
             StringBased(ref s) => s.to_json(),
             NumberBased(ref n) => n.to_json()
@@ -24,8 +24,8 @@ impl json::ToJson for Id {
 }
 
 pub enum Parameters {
-    Positional(json::JsonList),
-    Named(json::JsonObject)
+    Positional(JsonList),
+    Named(JsonObject)
 }
 
 pub struct Request {
@@ -49,8 +49,8 @@ pub enum Response {
     Error(ErrorResponse)
 }
 
-impl json::ToJson for Response {
-    fn to_json(&self) -> json::Json {
+impl ToJson for Response {
+    fn to_json(&self) -> Json {
         match *self {
             Normal(ref r) => r.to_json(),
             Error(ref e) => e.to_json()
@@ -60,11 +60,11 @@ impl json::ToJson for Response {
 
 pub struct NormalResponse {
     id: Id,
-    result: json::Json
+    result: Json
 }
 
 impl NormalResponse {
-    pub fn new(id: Id, result: json::Json) -> NormalResponse {
+    pub fn new(id: Id, result: Json) -> NormalResponse {
         return NormalResponse {
             id: id,
             result: result,
@@ -72,13 +72,13 @@ impl NormalResponse {
     }
 }
 
-impl json::ToJson for NormalResponse {
-    fn to_json(&self) -> json::Json {
-        let mut obj: TreeMap<String, json::Json> = TreeMap::new();
+impl ToJson for NormalResponse {
+    fn to_json(&self) -> Json {
+        let mut obj: TreeMap<String, Json> = TreeMap::new();
         obj.insert("jsonrpc".to_string(), "2.0".to_string().to_json());
         obj.insert("id".to_string(), self.id.to_json());
         obj.insert("result".to_string(), self.result.to_json());
-        json::Object(obj)
+        Object(obj)
     }
 }
 
@@ -86,11 +86,11 @@ pub struct ErrorResponse {
     id: Option<Id>,
     code: int,
     message: String,
-    data: json::Json
+    data: Json
 }
 
 impl ErrorResponse {
-    pub fn new(id: Option<Id>, code: int, message: String, data: json::Json) -> ErrorResponse {
+    pub fn new(id: Option<Id>, code: int, message: String, data: Json) -> ErrorResponse {
         ErrorResponse {
             id: id,
             code: code,
@@ -100,39 +100,39 @@ impl ErrorResponse {
     }
 
     fn newParseError() -> ErrorResponse {
-        ErrorResponse::new(None, -32700, "Parse error".to_string(), json::Null)
+        ErrorResponse::new(None, -32700, "Parse error".to_string(), Null)
     }
 
-    fn newInvalidRequest(data: json::Json) -> ErrorResponse {
+    fn newInvalidRequest(data: Json) -> ErrorResponse {
         ErrorResponse::new(None, -32600, "Invalid Request".to_string(), data)
     }
 
-    pub fn newMethodNotFound(id: Id, data: json::Json) -> ErrorResponse {
+    pub fn newMethodNotFound(id: Id, data: Json) -> ErrorResponse {
         ErrorResponse::new(Some(id), -32601, "Method not found".to_string(), data)
     }
 
-    pub fn newInvalidParams(id: Id, data: json::Json) -> ErrorResponse {
+    pub fn newInvalidParams(id: Id, data: Json) -> ErrorResponse {
         ErrorResponse::new(Some(id), -32602, "Invalid params".to_string(), data)
     }
 
-    fn newInternalError(id: Id, data: json::Json) -> ErrorResponse {
+    fn newInternalError(id: Id, data: Json) -> ErrorResponse {
         ErrorResponse::new(Some(id), -32603, "Internal error".to_string(), data)
     }
 }
 
-impl json::ToJson for ErrorResponse {
-    fn to_json(&self) -> json::Json {
-        let mut errorObj: TreeMap<String, json::Json> = TreeMap::new();
+impl ToJson for ErrorResponse {
+    fn to_json(&self) -> Json {
+        let mut errorObj: TreeMap<String, Json> = TreeMap::new();
         errorObj.insert("code".to_string(), self.code.to_json());
         errorObj.insert("message".to_string(), self.message.to_json());
         errorObj.insert("data".to_string(), self.data.to_json());
 
-        let mut obj: TreeMap<String, json::Json> = TreeMap::new();
+        let mut obj: TreeMap<String, Json> = TreeMap::new();
         obj.insert("jsonrpc".to_string(), "2.0".to_string().to_json());
         obj.insert("id".to_string(), self.id.to_json());
         obj.insert("error".to_string(), errorObj.to_json());
 
-        json::Object(obj)
+        Object(obj)
     }
 }
 
@@ -151,10 +151,17 @@ impl Server {
         }
     }
 
+    fn respond(&self, http_req: &mut IronRequest, jrpc_res: Response) -> IronResult<IronResponse> {
+        let res_str = encode(&jrpc_res.to_json());
+        let res_bytes = res_str.as_bytes();
+        let http_res = IronResponse::with(status::Ok, res_bytes);
+        Ok(http_res)
+    }
+
     pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
-        match str::from_utf8(req.body.as_slice()).and_then(|body| json::from_str(body).ok()) {
-            Some(body) => Ok(IronResponse::with(status::Ok, "JSON parsed")),
-            None => Ok(IronResponse::with(status::Ok, "JSON not parsed"))
+        match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
+            Some(body) => self.respond(req, Error(ErrorResponse::newParseError())),
+            None => self.respond(req, Error(ErrorResponse::newParseError()))
         }
     }
 }
