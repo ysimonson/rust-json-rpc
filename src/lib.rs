@@ -159,10 +159,20 @@ impl Server {
         Ok(http_res)
     }
 
+    fn handle_json_request(&self, req: TreeMap<String, Json>) -> Response {
+        let version = req.find(&"jsonrpc".to_string());
+
+        if !version.is_some() || version.unwrap() != &Json::String("2.0".to_string()) {
+            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC version specified".to_string())));
+        }
+
+        Error(ErrorResponse::newInvalidRequest(Json::String("Unimplemented".to_string())))
+    }
+
     pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
         match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
-            Some(body) => self.respond(Error(ErrorResponse::newParseError())),
-            None => self.respond(Error(ErrorResponse::newParseError()))
+            Some(Json::Object(body)) => self.respond(self.handle_json_request(body)),
+            _ => self.respond(Error(ErrorResponse::newParseError()))
         }
     }
 }
