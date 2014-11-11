@@ -8,17 +8,22 @@ use iron::{status, Iron, IronResult};
 use iron::Request as IronRequest;
 use iron::Response as IronResponse;
 use std::str;
+use std::string;
 
 pub enum Id {
-    StringBased(String),
-    NumberBased(f64)
+    String(string::String),
+    I64(i64),
+    U64(u64),
+    F64(f64)
 }
 
 impl ToJson for Id {
     fn to_json(&self) -> Json {
         match *self {
-            StringBased(ref s) => s.to_json(),
-            NumberBased(ref n) => n.to_json()
+            String(ref s) => s.to_json(),
+            I64(ref n) => n.to_json(),
+            U64(ref n) => n.to_json(),
+            F64(ref n) => n.to_json()
         }
     }
 }
@@ -30,12 +35,12 @@ pub enum Parameters {
 
 pub struct Request {
     id: Option<Id>,
-    method: String,
+    method: string::String,
     params: Parameters
 }
 
 impl Request {
-    pub fn new(id: Option<Id>, method: String, params: Parameters) -> Request {
+    pub fn new(id: Option<Id>, method: string::String, params: Parameters) -> Request {
         return Request {
             id: id,
             method: method,
@@ -74,7 +79,7 @@ impl NormalResponse {
 
 impl ToJson for NormalResponse {
     fn to_json(&self) -> Json {
-        let mut obj: TreeMap<String, Json> = TreeMap::new();
+        let mut obj: TreeMap<string::String, Json> = TreeMap::new();
         obj.insert("jsonrpc".to_string(), "2.0".to_string().to_json());
         obj.insert("id".to_string(), self.id.to_json());
         obj.insert("result".to_string(), self.result.to_json());
@@ -85,12 +90,12 @@ impl ToJson for NormalResponse {
 pub struct ErrorResponse {
     id: Option<Id>,
     code: int,
-    message: String,
+    message: string::String,
     data: Json
 }
 
 impl ErrorResponse {
-    pub fn new(id: Option<Id>, code: int, message: String, data: Json) -> ErrorResponse {
+    pub fn new(id: Option<Id>, code: int, message: string::String, data: Json) -> ErrorResponse {
         ErrorResponse {
             id: id,
             code: code,
@@ -122,12 +127,12 @@ impl ErrorResponse {
 
 impl ToJson for ErrorResponse {
     fn to_json(&self) -> Json {
-        let mut errorObj: TreeMap<String, Json> = TreeMap::new();
+        let mut errorObj: TreeMap<string::String, Json> = TreeMap::new();
         errorObj.insert("code".to_string(), self.code.to_json());
         errorObj.insert("message".to_string(), self.message.to_json());
         errorObj.insert("data".to_string(), self.data.to_json());
 
-        let mut obj: TreeMap<String, Json> = TreeMap::new();
+        let mut obj: TreeMap<string::String, Json> = TreeMap::new();
         obj.insert("jsonrpc".to_string(), "2.0".to_string().to_json());
         obj.insert("id".to_string(), self.id.to_json());
         obj.insert("error".to_string(), errorObj.to_json());
@@ -159,11 +164,43 @@ impl Server {
         Ok(http_res)
     }
 
-    fn handle_json_request(&self, req: TreeMap<String, Json>) -> Response {
+    fn handle_json_request(&self, req: TreeMap<string::String, Json>) -> Response {
         let version = req.find(&"jsonrpc".to_string());
 
         if !version.is_some() || version.unwrap() != &Json::String("2.0".to_string()) {
             return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC version specified".to_string())));
+        }
+
+        let method = match req.find(&"method".to_string()) {
+            Some(&Json::String(ref s)) => Some(s),
+            _ => None
+        };
+
+        if !method.is_some() {
+            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC method specified".to_string())));
+        }
+
+        let params = match req.find(&"params".to_string()) {
+            Some(&Json::Object(ref o)) => Some(Parameters::Named(o.clone())),
+            Some(&Json::List(ref l)) => Some(Parameters::Positional(l.clone())),
+            _ => None
+        };
+
+        if !params.is_some() {
+            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC params specified".to_string())));
+        }
+
+        let (id, is_invalid_id) = match req.find(&"id".to_string()) {
+            Some(&Json::String(ref s)) => (Some(Id::String(s.clone())), false),
+            Some(&Json::I64(n)) => (Some(Id::I64(n)), false),
+            Some(&Json::U64(n)) => (Some(Id::U64(n)), false),
+            Some(&Json::F64(n)) => (Some(Id::F64(n)), false),
+            Some(&Json::Null) => (None, false),
+            _ => (None, true)
+        };
+
+        if is_invalid_id {
+            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC id specified".to_string())));
         }
 
         Error(ErrorResponse::newInvalidRequest(Json::String("Unimplemented".to_string())))
