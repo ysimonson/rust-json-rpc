@@ -198,13 +198,30 @@ impl Server {
         return Ok(Request::new(id, method.unwrap().clone(), params.unwrap()))
     }
 
-    fn process_request(&self, request_json: Vec<Json>) -> Vec<Json> {
-        return Vec::new()
+    fn process_request(&self, request_json: Vec<TreeMap<string::String, Json>>) -> Vec<Json> {
+        let mut requests: Vec<Request> = Vec::with_capacity(request_json.len());
+        let mut responses: Vec<Response> = Vec::with_capacity(request_json.len());
+        let (tx, rx) = channel();
+
+        for body in request_json.into_iter() {
+            match self.parse_json_request(body) {
+                Ok(request) => requests.push(request),
+                Err(message) => responses.push(Response::Error(ErrorResponse::newInvalidRequest(Json::String(message))))
+            }
+        }
+
+        self.request_sender.send((requests, tx));
+
+        for app_response in rx.recv().into_iter() {
+            responses.push(app_response);
+        };
+
+        responses.map_in_place(|response| response.to_json())
     }
 
     fn single_request(&self, request_json: TreeMap<string::String, Json>) -> Json {
-        let mut wrapped_request_json: Vec<Json> = Vec::with_capacity(1);
-        wrapped_request_json.push(Json::Object(request_json));
+        let mut wrapped_request_json: Vec<TreeMap<string::String, Json>> = Vec::with_capacity(1);
+        wrapped_request_json.push(request_json);
         let mut wrapped_response_json = self.process_request(wrapped_request_json);
         wrapped_response_json.pop().unwrap()
     }
