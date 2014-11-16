@@ -198,15 +198,19 @@ impl Server {
         return Ok(Request::new(id, method.unwrap().clone(), params.unwrap()))
     }
 
-    fn process_request(&self, request_json: Vec<TreeMap<string::String, Json>>) -> Vec<Json> {
+    fn process_request(&self, request_json: Vec<Json>) -> Vec<Json> {
         let mut requests: Vec<Request> = Vec::with_capacity(request_json.len());
         let mut responses: Vec<Response> = Vec::with_capacity(request_json.len());
         let (tx, rx) = channel();
 
-        for body in request_json.into_iter() {
-            match self.parse_json_request(body) {
-                Ok(request) => requests.push(request),
-                Err(message) => responses.push(Response::Error(ErrorResponse::newInvalidRequest(Json::String(message))))
+        for json in request_json.into_iter() {
+            match json {
+                Json::Object(body) => match self.parse_json_request(body) {
+                    Ok(request) => requests.push(request),
+                    Err(message) => responses.push(Response::Error(ErrorResponse::newInvalidRequest(Json::String(message))))
+                },
+
+                _ => responses.push(Response::Error(ErrorResponse::newInvalidRequest(Json::String("Not a JSON object".to_string()))))
             }
         }
 
@@ -220,15 +224,20 @@ impl Server {
     }
 
     fn single_request(&self, request_json: TreeMap<string::String, Json>) -> Json {
-        let mut wrapped_request_json: Vec<TreeMap<string::String, Json>> = Vec::with_capacity(1);
-        wrapped_request_json.push(request_json);
+        let mut wrapped_request_json: Vec<Json> = Vec::with_capacity(1);
+        wrapped_request_json.push(Json::Object(request_json));
         let mut wrapped_response_json = self.process_request(wrapped_request_json);
         wrapped_response_json.pop().unwrap()
+    }
+
+    fn batch_request(&self, request_json: Vec<Json>) -> Json {
+        Json::List(self.process_request(request_json))
     }
 
     pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
         let response_json = match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
             Some(Json::Object(body)) => self.single_request(body),
+            Some(Json::List(body)) => self.batch_request(body),
             _ => Error(ErrorResponse::newParseError()).to_json()
         };
 
