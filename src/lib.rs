@@ -156,19 +156,11 @@ impl Server {
         }
     }
 
-    fn respond(&self, jrpc_res: Response) -> IronResult<IronResponse> {
-        let res_str = encode(&jrpc_res.to_json());
-        let res_bytes = res_str.as_bytes();
-        let mut http_res = IronResponse::with(status::Ok, res_bytes);
-        http_res.headers.content_type = Some(iron::headers::content_type::MediaType::new("application".to_string(), "json".to_string(), Vec::new()));
-        Ok(http_res)
-    }
-
-    fn handle_json_request(&self, req: TreeMap<string::String, Json>) -> Response {
+    fn parse_json_request(&self, req: TreeMap<string::String, Json>) -> Result<Request, string::String> {
         let version = req.find(&"jsonrpc".to_string());
 
         if !version.is_some() || version.unwrap() != &Json::String("2.0".to_string()) {
-            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC version specified".to_string())));
+            return Err("Invalid version specified".to_string());
         }
 
         let method = match req.find(&"method".to_string()) {
@@ -177,7 +169,7 @@ impl Server {
         };
 
         if !method.is_some() {
-            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC method specified".to_string())));
+            return Err("Invalid method specified".to_string());
         }
 
         let params = match req.find(&"params".to_string()) {
@@ -187,7 +179,7 @@ impl Server {
         };
 
         if !params.is_some() {
-            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC params specified".to_string())));
+            return Err("Invalid params specified".to_string());
         }
 
         let (id, is_invalid_id) = match req.find(&"id".to_string()) {
@@ -200,16 +192,33 @@ impl Server {
         };
 
         if is_invalid_id {
-            return Error(ErrorResponse::newInvalidRequest(Json::String("Invalid JSON-RPC id specified".to_string())));
+            return Err("Invalid id specified".to_string());
         }
 
-        Error(ErrorResponse::newInvalidRequest(Json::String("Unimplemented".to_string())))
+        return Ok(Request::new(id, method.unwrap().clone(), params.unwrap()))
+    }
+
+    fn process_request(&self, request_json: Vec<Json>) -> Vec<Json> {
+        return Vec::new()
+    }
+
+    fn single_request(&self, request_json: TreeMap<string::String, Json>) -> Json {
+        let mut wrapped_request_json: Vec<Json> = Vec::with_capacity(1);
+        wrapped_request_json.push(Json::Object(request_json));
+        let mut wrapped_response_json = self.process_request(wrapped_request_json);
+        wrapped_response_json.pop().unwrap()
     }
 
     pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
-        match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
-            Some(Json::Object(body)) => self.respond(self.handle_json_request(body)),
-            _ => self.respond(Error(ErrorResponse::newParseError()))
-        }
+        let response_json = match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
+            Some(Json::Object(body)) => self.single_request(body),
+            _ => Error(ErrorResponse::newParseError()).to_json()
+        };
+
+        let response_str = encode(&response_json.to_json());
+        let response_bytes = response_str.as_bytes();
+        let mut response_http = IronResponse::with(status::Ok, response_bytes);
+        response_http.headers.content_type = Some(iron::headers::content_type::MediaType::new("application".to_string(), "json".to_string(), Vec::new()));
+        Ok(response_http)
     }
 }
