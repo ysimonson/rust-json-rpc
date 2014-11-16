@@ -142,7 +142,7 @@ impl ToJson for ErrorResponse {
 }
 
 pub struct Server {
-    requestSender: Sender<(Vec<Request>, Sender<Vec<Response>>)>,
+    request_sender: Sender<(Vec<Request>, Sender<Vec<Response>>)>,
     requests: Receiver<(Vec<Request>, Sender<Vec<Response>>)>
 }
 
@@ -151,7 +151,7 @@ impl Server {
         let (tx, rx) = channel();
 
         Server {
-            requestSender: tx,
+            request_sender: tx,
             requests: rx,
         }
     }
