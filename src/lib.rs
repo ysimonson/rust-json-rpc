@@ -8,6 +8,7 @@ use iron::Request as IronRequest;
 use iron::Response as IronResponse;
 use std::str;
 use std::string;
+use iron::middleware::Handler;
 
 pub enum Id {
     String(string::String),
@@ -228,8 +229,10 @@ impl Server {
     fn batch_request(&self, request_json: Vec<Json>) -> Json {
         Json::List(self.process_request(request_json))
     }
+}
 
-    pub fn listener(&self, req: &mut IronRequest) -> IronResult<IronResponse> {
+impl Handler for Server {
+    fn call(&self, &mut IronRequest) -> IronResult<IronResponse> {
         let response_json = match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
             Some(Json::Object(body)) => self.single_request(body),
             Some(Json::List(body)) => self.batch_request(body),
@@ -241,5 +244,9 @@ impl Server {
         let mut response_http = IronResponse::with(status::Ok, response_bytes);
         response_http.headers.content_type = Some(iron::headers::content_type::MediaType::new("application".to_string(), "json".to_string(), Vec::new()));
         Ok(response_http)
+    }
+
+    fn catch(&self, _: &mut Request, err: IronError) -> (Response, IronResult<()>) {
+        (IronResponse::new().set(Status(status::InternalServerError)), Err(err))
     }
 }
