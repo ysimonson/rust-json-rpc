@@ -232,7 +232,7 @@ impl Server {
 }
 
 impl Handler for Server {
-    fn call(&self, &mut IronRequest) -> IronResult<IronResponse> {
+    fn call(&self,req: &mut IronRequest) -> IronResult<IronResponse> {
         let response_json = match str::from_utf8(req.body.as_slice()).and_then(|body| from_str(body).ok()) {
             Some(Json::Object(body)) => self.single_request(body),
             Some(Json::List(body)) => self.batch_request(body),
