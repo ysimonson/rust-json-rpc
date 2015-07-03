@@ -4,6 +4,7 @@ extern crate iron;
 use serialize::json::{ToJson, Json, JsonList, JsonObject, Object, Null, encode, from_str};
 use std::collections::TreeMap;
 use iron::{status, IronResult};
+use iron::mime::Mime;
 use iron::Request as IronRequest;
 use iron::Response as IronResponse;
 use std::str;
@@ -238,12 +239,10 @@ impl Handler for Server {
             Some(Json::List(body)) => self.batch_request(body),
             _ => Error(ErrorResponse::new_parse_error()).to_json()
         };
-
-        let response_str = encode(&response_json.to_json());
-        let response_bytes = response_str.as_bytes();
-        let mut response_http = IronResponse::with(status::Ok, response_bytes);
-        response_http.headers.content_type = Some(iron::headers::content_type::MediaType::new("application".to_string(), "json".to_string(), Vec::new()));
-        Ok(response_http)
+        
+        let response_content_type = "application/json".parse::<Mime>().unwrap();
+        let response_content = encode(&response_json.to_json());
+        Ok(IronResponse::with((response_content_type, status::Ok, response_content )))
     }
 
     fn catch(&self, _: &mut Request, err: IronError) -> (Response, IronResult<()>) {
