@@ -242,7 +242,7 @@ impl Handler for Server {
         
         let response_content_type = "application/json".parse::<Mime>().unwrap();
         let response_content = encode(&response_json.to_json());
-        Ok(Response::with((response_content_type, status::Ok, response_content )))
+        Ok(IronResponse::with((response_content_type, status::Ok, response_content )))
     }
 
     fn catch(&self, _: &mut Request, err: IronError) -> (Response, IronResult<()>) {
